@@ -1,7 +1,5 @@
 ---
 title: "Peer Assessment1 of Reproducible Research"
-author: "ravi rachakonda"
-date: "Saturday, March 14, 2015"
 output: html_document
 ---
 
