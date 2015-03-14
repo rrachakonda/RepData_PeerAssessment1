@@ -1,25 +1,94 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Peer Assessment1 of Reproducible Research"
+author: "ravi rachakonda"
+date: "Saturday, March 14, 2015"
+output: html_document
 ---
 
 
-## Loading and preprocessing the data
+Loading and Preprocessing the Data
 
+```{r, echo=TRUE}
+data <- read.table("activity.csv", header=T, quote="\"", sep=",")
 
+# convert date to date data type
+data$date <- as.Date(data$date) 
 
-## What is mean total number of steps taken per day?
+```
 
+what is the mean total number of steps taken per day?
+```{r, echo=TRUE}
+data.ignore.na<-na.omit(data)
+daily.steps<-rowsum(data.ignore.na$steps,format(data.ignore.na$date,'%Y-%m-%d'))
+daily.steps<-data.frame(daily.steps)
+names(daily.steps)<-("steps")
+```
+plot histogram of total number of steps taken each day
+```{r, echo=TRUE}
+hist(daily.steps$steps,main=" ",breaks=10,xlab="total number of steps taken daily")
+```
+calculate mean and median of steps
+```{r, echo=TRUE}
+mean(daily.steps$steps)
+median(daily.steps$steps)
+```
+what is the daily average activity pattern?
+```{r, echo=TRUE}
+library(plyr)
+interval.mean.steps<-ddply(data.ignore.na,~interval,summarise,mean=mean(steps))
+```
+plot the time series of 5-minute interval and average of number of steps taken, averaged acorss all days.
+```{r, echo=TRUE}
+library(ggplot2)
+qplot(x=interval,y=mean,data=interval.mean.steps,geom="line",xlab="5 minute interval",ylab="number of step count",main="average number of steps taken averaged acorss all days")
+```
+input missing values
+```{r, echo=TRUE}
+library(sqldf)
+varNA<-sqldf('select d.* from "data" as d where d.steps is null order by d.date,d.interval')
+ NROW(varNA)            
+```
+Implement a strategy to fill the missing data values in the data set.
+```{r, echo=TRUE}
+fillNA<-sqldf('select d.*,i.mean from "interval.mean.steps" as i join "data" as d on d.interval = i.interval order by d.date,d.interval')
+fillNA$steps[is.na(fillNA$steps)]<-fillNA$mean[is.na(fillNA$steps)]
+```
+Below, plot the histogram and calculate mean and median with missing values filled in.
+```{r, echo=TRUE}
+fillNA.total.steps<-as.integer(sqldf('select sum(steps) from fillNA'))
 
+fillNA.total.steps.by.date <- sqldf(' 
+    SELECT date, sum(steps) as "steps" 
+    FROM fillNA GROUP BY date 
+    ORDER BY date') 
 
-## What is the average daily activity pattern?
+daily.steps <- sqldf('   
+    SELECT date, steps
+    FROM "fillNA.total.steps.by.date"
+    ORDER BY date')
 
+```
+make a histogram of total number of steps taken each day.
+```{r, echo=TRUE}
+hist(daily.steps$steps,main=" ",breaks=10,xlab="after input NA--total number of steps taken daily")
+```
+calculate the mean and median total number of steps taken per day.
+```{r, echo=TRUE}
+mean.steps.per.day<-as.integer(fillNA.total.steps/NROW(fillNA.total.steps.by.date))
+mean.steps.per.day
 
+median.steps.per.day<-median(fillNA.total.steps.by.date$steps)
+median.steps.per.day
+```
+are there any differences in activity pattern between weekdays and weekends ?
+```{r, echo=TRUE}
+fillNA$weektime<-as.factor(ifelse(weekdays(fillNA$date) %in% c("Saturday","Sunday"),"weekend","weekday"))
+var2<-sqldf('select interval,avg(steps) as "mean.steps",weektime from fillNA group by weektime,interval order by interval')
+```
+make a plot containing a time series plot of the 5 minute interval(x-axis) and average number of steps taken, averaged across all weekdays or weekend days(y-axis).
+```{r, echo=TRUE}
+library(lattice)
+plot<-xyplot(mean.steps~interval|factor(weektime),data=var2,type='l',main="average number of steps taken \naveraged across all weekdays or weekend days",xlab="5 minute interval",ylab="average number of steps taken")
+print(plot)
 
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+```
